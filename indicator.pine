@@ -1,0 +1,221 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © Kazź (Thibault)
+// 1.3.0
+
+//@version=5
+indicator(title='MTF Choppiness Index', shorttitle='MTF Chop Index')
+
+
+//————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
+// CONSTANTS —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
+//————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
+
+
+color   constDefaultColor   = color.rgb(red=33, green=150, blue=243, transp=85)
+int     constLength         = 14
+string  constSymbol         = syminfo.tickerid
+
+
+//————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
+// INPUTS ————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
+//————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
+
+
+string  inputStringSymbol               =   input.symbol(defval='', title='Select Computed Asset', tooltip='Leave a blank to select current asset', group='Symbol')
+
+int     inputIntMultiplierTimeframe1    =   input.int(defval=1, minval=1, maxval=50, title='Multiplier ➜', tooltip='Multiply the current graphic time frame by the chosen factor', group='Time frame 1')
+int     inputIntMultiplierTimeframe2    =   input.int(defval=2, minval=1, maxval=50, title='Multiplier ➜', tooltip='Multiply the current graphic time frame by the chosen factor', group='Time frame 2')
+int     inputIntMultiplierTimeframe3    =   input.int(defval=4, minval=1, maxval=50, title='Multiplier ➜', tooltip='Multiply the current graphic time frame by the chosen factor', group='Time frame 3')
+int     inputIntMultiplierTimeframe4    =   input.int(defval=10, minval=1, maxval=50, title='Multiplier ➜', tooltip='Multiply the current graphic time frame by the chosen factor', group='Time frame 4')
+int     inputIntMultiplierTimeframe5    =   input.int(defval=12, minval=1, maxval=50, title='Multiplier ➜', tooltip='Multiply the current graphic time frame by the chosen factor', group='Time frame 5')
+
+bool    inputBoolStaticTimeframe1       =   input.bool(defval=false, title='Make static with unit', tooltip='If checked, the time frame 1 will be constrainted to the selected value', inline='01', group='Time frame 1')
+bool    inputBoolStaticTimeframe2       =   input.bool(defval=false, title='Make static with unit', tooltip='If checked, the time frame 2 will be constrainted to the selected value', inline='02', group='Time frame 2')
+bool    inputBoolStaticTimeframe3       =   input.bool(defval=false, title='Make static with unit', tooltip='If checked, the time frame 3 will be constrainted to the selected value', inline='03', group='Time frame 3')
+bool    inputBoolStaticTimeframe4       =   input.bool(defval=false, title='Make static with unit', tooltip='If checked, the time frame 4 will be constrainted to the selected value', inline='04', group='Time frame 4')
+bool    inputBoolStaticTimeframe5       =   input.bool(defval=false, title='Make static with unit', tooltip='If checked, the time frame 5 will be constrainted to the selected value', inline='05', group='Time frame 5')
+
+string  inputStringStaticTimeframe1     =   input.timeframe(defval='', title='➜', inline='01' , group='Time frame 1')
+string  inputStringStaticTimeframe2     =   input.timeframe(defval='15', title='➜', inline='02' , group='Time frame 2')
+string  inputStringStaticTimeframe3     =   input.timeframe(defval='30', title='➜', inline='03' , group='Time frame 3')
+string  inputStringStaticTimeframe4     =   input.timeframe(defval='60', title='➜', inline='04' , group='Time frame 4')
+string  inputStringStaticTimeframe5     =   input.timeframe(defval='240', title='➜', inline='05' , group='Time frame 5')
+
+bool    inputBoolEnableTimeframe1       =   input.bool(defval=true, title='Enable this time frame ⚠️', tooltip='If unchecked, the time frame 1 will not be computed and displayed nor used for alerts anymore', group='Time frame 1')
+bool    inputBoolEnableTimeframe2       =   input.bool(defval=true, title='Enable this time frame ⚠️', tooltip='If unchecked, the time frame 2 will not be computed and displayed nor used for alerts anymore', group='Time frame 2')
+bool    inputBoolEnableTimeframe3       =   input.bool(defval=true, title='Enable this time frame ⚠️', tooltip='If unchecked, the time frame 3 will not be computed and displayed nor used for alerts anymore', group='Time frame 3')
+bool    inputBoolEnableTimeframe4       =   input.bool(defval=true, title='Enable this time frame ⚠️', tooltip='If unchecked, the time frame 4 will not be computed and displayed nor used for alerts anymore', group='Time frame 4')
+bool    inputBoolEnableTimeframe5       =   input.bool(defval=true, title='Enable this time frame ⚠️', tooltip='If unchecked, the time frame 5 will not be computed and displayed nor used for alerts anymore', group='Time frame 5')
+
+bool    inputBoolEnableTable            =   input.bool(defval=true, title='Show Charged Up Table', tooltip='Table will be used to display which time frames are charged up', group='Charged Up Table')
+color   inputColorTextTable             =   input.color(defval=color.white, title='Color Text', inline='06', group='Charged Up Table')
+color   inputColorBackgroundTable       =   input.color(defval=#2196f3, title='Color Background', inline='06', group='Charged Up Table')
+string  inputStringPositionTable        =   input.string(defval=position.bottom_right, title='Position', options=[position.top_left, position.top_center, position.top_right, position.middle_left, position.middle_center, position.middle_right, position.bottom_left, position.bottom_center, position.bottom_right], group='Charged Up Table')
+
+
+//————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
+// FUNCTIONS —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
+//————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
+
+
+functionDrawChop(timeframe) =>
+    taAtr       = request.security(symbol=inputStringSymbol, timeframe=timeframe, expression=math.sum(ta.atr(1), constLength), gaps=barmerge.gaps_off, lookahead=barmerge.lookahead_on)
+    taHighest   = request.security(symbol=inputStringSymbol, timeframe=timeframe, expression=ta.highest(constLength), gaps=barmerge.gaps_off, lookahead=barmerge.lookahead_on)
+    taLowest    = request.security(symbol=inputStringSymbol, timeframe=timeframe, expression=ta.lowest(constLength), gaps=barmerge.gaps_off, lookahead=barmerge.lookahead_on)
+    // return
+    (100 * math.log10(taAtr / (taHighest - taLowest)) / math.log10(constLength) - 50) * 8.47457627
+    
+functionMultiplyTimeframe(factor) => 
+    float timeframeInMinutes = timeframe.multiplier * factor * (
+      timeframe.isseconds   ? 1. / 60. :
+      timeframe.isminutes   ? 1. :
+      timeframe.isdaily     ? 1440. :
+      timeframe.isweekly    ? 7. * 24. * 60. :
+      timeframe.ismonthly   ? 30.417 * 24. * 60. : na)
+    // return
+    timeframeInMinutes      <= 0.0417   ? '1S'  :
+      timeframeInMinutes    <= 0.167    ? '5S'  :
+      timeframeInMinutes    <= 0.376    ? '15S' :
+      timeframeInMinutes    <= 0.751    ? '30S' :
+      timeframeInMinutes    < 1440      ? str.tostring(math.round(timeframeInMinutes)) :
+      str.tostring(math.round(math.min(timeframeInMinutes / 1440, 365))) + 'D'
+      
+functionFormatLabelTimeframe(timeframe, dashed) => 
+    string formattedTimeframe = timeframe
+    
+    if (not(str.contains(timeframe, 'S')) and not(str.contains(timeframe, 'D')) and not(str.contains(timeframe, 'W')) and not(str.contains(timeframe, 'M') and not(str.contains(timeframe, 'Y'))))
+        if (str.tonumber(timeframe) % 60 == 0)
+            formattedTimeframe := str.tostring(math.round(math.min(str.tonumber(timeframe) / 60, 24))) + 'h'
+        else
+            formattedTimeframe := timeframe + 'm'
+    // return
+    (dashed ? ' - ' : '') + formattedTimeframe
+
+
+//————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
+// PLOTS —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
+//————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
+
+
+hline(price=100, title='Charged Up Band ➜', color=#b2b5be, linestyle=hline.style_dashed)
+hline(price=0, title='Middle Band ➜', color=#1848cc, linestyle=hline.style_solid)
+hline(price=-100, title='Exhausted Band ➜', color=#b2b5be, linestyle=hline.style_dashed)
+
+string  constFinalTimeframe1    =   inputBoolStaticTimeframe1 ? (inputStringStaticTimeframe1 == '' ? timeframe.period : inputStringStaticTimeframe1) : functionMultiplyTimeframe(inputIntMultiplierTimeframe1)
+string  constFinalTimeframe2    =   inputBoolStaticTimeframe2 ? (inputStringStaticTimeframe2 == '' ? timeframe.period : inputStringStaticTimeframe2) : functionMultiplyTimeframe(inputIntMultiplierTimeframe2)
+string  constFinalTimeframe3    =   inputBoolStaticTimeframe3 ? (inputStringStaticTimeframe3 == '' ? timeframe.period : inputStringStaticTimeframe3) : functionMultiplyTimeframe(inputIntMultiplierTimeframe3)
+string  constFinalTimeframe4    =   inputBoolStaticTimeframe4 ? (inputStringStaticTimeframe4 == '' ? timeframe.period : inputStringStaticTimeframe4) : functionMultiplyTimeframe(inputIntMultiplierTimeframe4)
+string  constFinalTimeframe5    =   inputBoolStaticTimeframe5 ? (inputStringStaticTimeframe5 == '' ? timeframe.period : inputStringStaticTimeframe5) : functionMultiplyTimeframe(inputIntMultiplierTimeframe5)
+
+varSeriesChopTimeframe1         =   functionDrawChop(constFinalTimeframe1)
+varSeriesChopTimeframe2         =   functionDrawChop(constFinalTimeframe2)
+varSeriesChopTimeframe3         =   functionDrawChop(constFinalTimeframe3)
+varSeriesChopTimeframe4         =   functionDrawChop(constFinalTimeframe4)
+varSeriesChopTimeframe5         =   functionDrawChop(constFinalTimeframe5)
+
+plot(series=inputBoolEnableTimeframe1 ? varSeriesChopTimeframe1 : na, title='Line 1 ➜', color=#9575cd, linewidth=2)
+plot(series=inputBoolEnableTimeframe2 ? varSeriesChopTimeframe2 : na, title='Line 2 ➜', color=color.rgb(248, 187, 208, 100), linewidth=2)
+plot(series=inputBoolEnableTimeframe3 ? varSeriesChopTimeframe3 : na, title='Line 3 ➜', color=color.rgb(244, 143, 177, 100), linewidth=2)
+plot(series=inputBoolEnableTimeframe4 ? varSeriesChopTimeframe4 : na, title='Line 4 ➜', color=color.rgb(240, 98, 146, 100), linewidth=2)
+plot(series=inputBoolEnableTimeframe5 ? varSeriesChopTimeframe5 : na, title='Line 5 ➜', color=color.rgb(178, 40, 51, 100), linewidth=2)
+
+
+//————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
+// BACKGROUNDS ———————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
+//————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
+
+
+bool constBoolChargedUpTimeframe1 = varSeriesChopTimeframe1 >= 100
+bool constBoolChargedUpTimeframe2 = varSeriesChopTimeframe2 >= 100
+bool constBoolChargedUpTimeframe3 = varSeriesChopTimeframe3 >= 100
+bool constBoolChargedUpTimeframe4 = varSeriesChopTimeframe4 >= 100
+bool constBoolChargedUpTimeframe5 = varSeriesChopTimeframe5 >= 100
+
+bgcolor(color=inputBoolEnableTimeframe1 and constBoolChargedUpTimeframe1 ? constDefaultColor : na, title='Background 1 🡇')
+bgcolor(color=inputBoolEnableTimeframe2 and constBoolChargedUpTimeframe2 ? constDefaultColor : na, title='Background 2 🡇')
+bgcolor(color=inputBoolEnableTimeframe3 and constBoolChargedUpTimeframe3 ? constDefaultColor : na, title='Background 3 🡇')
+bgcolor(color=inputBoolEnableTimeframe4 and constBoolChargedUpTimeframe4 ? constDefaultColor : na, title='Background 4 🡇')
+bgcolor(color=inputBoolEnableTimeframe5 and constBoolChargedUpTimeframe5 ? constDefaultColor : na, title='Background 5 🡇')
+
+// Count charged up time frames
+
+int varIntChopChargedUpCount = 0
+int varIntPreviousChopChargedUpCount = 0
+string varStringChopChargedUpText = ''
+
+if not str.contains(constSymbol, inputStringSymbol)
+    varStringChopChargedUpText += inputStringSymbol + ' '
+
+if inputBoolEnableTimeframe1
+    if constBoolChargedUpTimeframe1
+        varIntChopChargedUpCount += 1
+        if inputBoolEnableTable
+            varStringChopChargedUpText += functionFormatLabelTimeframe(constFinalTimeframe1, false)
+    if varSeriesChopTimeframe1[1] >= 100
+        varIntPreviousChopChargedUpCount += 1
+
+if inputBoolEnableTimeframe2
+    if constBoolChargedUpTimeframe2
+        varIntChopChargedUpCount += 1
+        if inputBoolEnableTable 
+            varStringChopChargedUpText += functionFormatLabelTimeframe(constFinalTimeframe2, str.length(varStringChopChargedUpText) > 0)
+    if varSeriesChopTimeframe2[1] >= 100
+        varIntPreviousChopChargedUpCount += 1
+        
+if inputBoolEnableTimeframe3 
+    if constBoolChargedUpTimeframe3
+        varIntChopChargedUpCount += 1
+        if inputBoolEnableTable 
+            varStringChopChargedUpText += functionFormatLabelTimeframe(constFinalTimeframe3, str.length(varStringChopChargedUpText) > 0)
+    if varSeriesChopTimeframe3[1] >= 100
+        varIntPreviousChopChargedUpCount += 1
+        
+if inputBoolEnableTimeframe4 
+    if constBoolChargedUpTimeframe4
+        varIntChopChargedUpCount += 1
+        if inputBoolEnableTable 
+            varStringChopChargedUpText += functionFormatLabelTimeframe(constFinalTimeframe4, str.length(varStringChopChargedUpText) > 0)
+    if varSeriesChopTimeframe4[1] >= 100
+        varIntPreviousChopChargedUpCount += 1
+        
+if inputBoolEnableTimeframe5 
+    if constBoolChargedUpTimeframe5
+        varIntChopChargedUpCount += 1
+        if inputBoolEnableTable
+            varStringChopChargedUpText += functionFormatLabelTimeframe(constFinalTimeframe5, str.length(varStringChopChargedUpText) > 0)    
+    if varSeriesChopTimeframe5[1] >= 100
+        varIntPreviousChopChargedUpCount += 1
+
+
+//————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
+// TABLE —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
+//————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
+
+
+var varTableChargedUpTimeframes = table.new(position=inputStringPositionTable, columns=1, rows=1, border_width=0)
+
+if inputBoolEnableTable
+    if varIntChopChargedUpCount > 0 
+        table.cell(table_id=varTableChargedUpTimeframes, column=0, row=0, text=varStringChopChargedUpText, text_color=inputColorTextTable, text_size=size.normal, bgcolor=inputColorBackgroundTable)
+    else
+        table.cell(table_id=varTableChargedUpTimeframes, column=0, row=0, text='')
+else
+    table.cell(table_id=varTableChargedUpTimeframes, column=0, row=0, text='')
+
+
+//————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
+// ALERTS ————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
+//————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
+
+
+alertcondition(condition=inputBoolEnableTimeframe1 and constBoolChargedUpTimeframe1 and varSeriesChopTimeframe1[1] < 100, title='Chop TF1 is charged up', message='Chop is charged up on time frame 1 up')
+alertcondition(condition=inputBoolEnableTimeframe2 and constBoolChargedUpTimeframe2 and varSeriesChopTimeframe2[1] < 100, title='Chop TF2 is charged up', message='Chop is charged up on time frame 2 up')
+alertcondition(condition=inputBoolEnableTimeframe3 and constBoolChargedUpTimeframe3 and varSeriesChopTimeframe3[1] < 100, title='Chop TF3 is charged up', message='Chop is charged up on time frame 3 up')
+alertcondition(condition=inputBoolEnableTimeframe4 and constBoolChargedUpTimeframe4 and varSeriesChopTimeframe4[1] < 100, title='Chop TF4 is charged up', message='Chop is charged up on time frame 4 up')
+alertcondition(condition=inputBoolEnableTimeframe5 and constBoolChargedUpTimeframe5 and varSeriesChopTimeframe5[1] < 100, title='Chop TF5 is charged up', message='Chop is charged up on time frame 5 up')
+
+alertcondition(condition=varIntPreviousChopChargedUpCount < varIntChopChargedUpCount and varIntChopChargedUpCount >= 1, title='At least 1 chops are charged up', message='1 chops or more are charged up among selected time frames')
+alertcondition(condition=varIntPreviousChopChargedUpCount < varIntChopChargedUpCount and varIntChopChargedUpCount >= 2, title='At least 2 chops are charged up', message='2 chops or more are charged up among selected time frames')
+alertcondition(condition=varIntPreviousChopChargedUpCount < varIntChopChargedUpCount and varIntChopChargedUpCount >= 3, title='At least 3 chops are charged up', message='3 chops or more are charged up among selected time frames')
+alertcondition(condition=varIntPreviousChopChargedUpCount < varIntChopChargedUpCount and varIntChopChargedUpCount >= 4, title='At least 4 chops are charged up', message='4 chops or more are charged up among selected time frames')
+alertcondition(condition=varIntPreviousChopChargedUpCount < varIntChopChargedUpCount and varIntChopChargedUpCount >= 5, title='At least 5 chops are charged up', message='5 chops or more are charged up among selected time frames') 
